@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator</title>
+    <!-- Load Tailwind CSS for simple, clean, and responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load QRCode.js library for generating QR Codes -->
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+    <style>
+        /* Custom CSS to ensure the canvas/image inside the QR code container is centered */
+        #qrcode-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            min-height: 200px; /* Ensure space even before generation */
+        }
+        /* Style to ensure the generated QR code looks crisp */
+        #qrcode-container img, #qrcode-container canvas {
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 font-sans">
+
+    <div class="w-full max-w-lg bg-white rounded-xl shadow-2xl p-6 sm:p-8">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-2 text-center">
+            Link to QR Code
+        </h1>
+        <p class="text-gray-500 mb-6 text-center">
+            Generate a scannable QR code for any Google Drive link.
+        </p>
+
+        <!-- Input Section -->
+        <div class="space-y-4">
+            <label for="linkInput" class="block text-sm font-medium text-gray-700">Google Drive Link or URL</label>
+            <input type="url" id="linkInput" placeholder="e.g., https://drive.google.com/..."
+                   class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out shadow-sm"
+                   onkeydown="if(event.key === 'Enter') document.getElementById('generateBtn').click()">
+            
+            <button id="generateBtn"
+                    class="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition duration-200 ease-in-out transform hover:scale-[1.01]">
+                Generate QR Code
+            </button>
+        </div>
+
+        <!-- Output Section -->
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <h2 id="outputTitle" class="text-xl font-semibold text-gray-800 mb-4 text-center hidden">
+                Your QR Code
+            </h2>
+            <!-- This is where the QR code will be rendered -->
+            <div id="qrcode-container" class="bg-gray-50 rounded-lg border border-gray-200">
+                <p id="placeholderText" class="text-gray-400 text-center p-8">
+                    Enter a link and click 'Generate' to see your QR code here.
+                </p>
+            </div>
+
+            <!-- Download Button (Initially hidden) -->
+            <button id="downloadBtn"
+                    class="hidden w-full mt-4 py-3 px-4 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-50 transition duration-200 ease-in-out transform hover:scale-[1.01]"
+                    onclick="downloadQRCode()">
+                Download QR Code (PNG)
+            </button>
+        </div>
+
+        <!-- Error/Message Box -->
+        <div id="messageBox" class="mt-4 p-3 bg-red-100 text-red-700 rounded-lg hidden" role="alert">
+            <!-- Error messages go here -->
+        </div>
+
+    </div>
+
+    <script>
+        // Global variable to hold the QR code instance
+        let qrcodeInstance = null;
+        
+        // Event listener for the Generate button
+        document.getElementById('generateBtn').addEventListener('click', generateQRCode);
+
+        /**
+         * Clears previous content and displays a message.
+         * @param {string} message The message to display.
+         * @param {boolean} isError If true, displays as an error.
+         */
+        function showMessage(message, isError = false) {
+            const msgBox = document.getElementById('messageBox');
+            msgBox.textContent = message;
+            msgBox.classList.remove('hidden');
+            
+            if (isError) {
+                msgBox.classList.remove('bg-red-100', 'text-red-700');
+                msgBox.classList.add('bg-red-100', 'text-red-700');
+            } else {
+                msgBox.classList.remove('bg-red-100', 'text-red-700');
+                msgBox.classList.add('bg-blue-100', 'text-blue-700'); // Use a standard message color
+            }
+        }
+
+        /**
+         * Hides the message box.
+         */
+        function hideMessage() {
+            document.getElementById('messageBox').classList.add('hidden');
+        }
+
+        /**
+         * Handles the QR code generation process.
+         */
+        function generateQRCode() {
+            const linkInput = document.getElementById('linkInput');
+            const url = linkInput.value.trim();
+            const qrContainer = document.getElementById('qrcode-container');
+            const placeholderText = document.getElementById('placeholderText');
+            const outputTitle = document.getElementById('outputTitle');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            // 1. Validation
+            if (!url) {
+                showMessage("Please enter a valid link.", true);
+                qrContainer.innerHTML = '';
+                placeholderText.classList.remove('hidden');
+                outputTitle.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
+                return;
+            }
+
+            hideMessage();
+            placeholderText.classList.add('hidden');
+            outputTitle.classList.remove('hidden');
+
+            // 2. Clear previous QR code
+            qrContainer.innerHTML = '';
+            
+            // 3. Generate new QR code using QRCode.js
+            try {
+                // Initialize the QR code generator
+                qrcodeInstance = new QRCode(qrContainer, {
+                    text: url,
+                    width: 256,
+                    height: 256,
+                    colorDark : "#1f2937", // Gray-800
+                    colorLight : "#ffffff", // White background
+                    correctLevel : QRCode.CorrectLevel.H // High error correction
+                });
+
+                // Display the download button after a short delay to ensure the image is rendered
+                setTimeout(() => {
+                    downloadBtn.classList.remove('hidden');
+                }, 200);
+
+
+            } catch (error) {
+                showMessage("An error occurred during QR code generation. Please check the URL format.", true);
+                console.error("QRCode Generation Error:", error);
+                placeholderText.classList.remove('hidden');
+                outputTitle.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Downloads the generated QR code image (only works if generated as a Canvas or Image).
+         */
+        function downloadQRCode() {
+            const qrContainer = document.getElementById('qrcode-container');
+            
+            // QRCode.js renders either a canvas or an img element. We target the first child.
+            const qrElement = qrContainer.firstChild; 
+
+            if (!qrElement) {
+                showMessage("No QR code generated yet to download.", true);
+                return;
+            }
+            
+            let dataUrl = '';
+            
+            if (qrElement.tagName === 'CANVAS') {
+                // Get data URL from canvas
+                dataUrl = qrElement.toDataURL("image/png");
+            } else if (qrElement.tagName === 'IMG') {
+                // Get data URL from image (if rendering in browser that uses IMG fallback)
+                dataUrl = qrElement.src;
+            } else {
+                 showMessage("Download failed: Could not find the QR code image data.", true);
+                 return;
+            }
+
+            // Create a temporary anchor element for download
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = 'google_drive_qr_code.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showMessage("QR Code downloaded successfully!", false);
+        }
+    </script>
+</body>
+</html>
